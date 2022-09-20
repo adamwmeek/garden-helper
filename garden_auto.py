@@ -131,13 +131,16 @@ async def main():
                 pass 
 
         # Update display based on state
-        if state.is_realDamp:
+        if state.is_preDamp:
             draw_text('Damp')
             await send_watered_message()
-        
-        if state.is_realDry:
+            
+        elif state.is_realDry:
             draw_text('Dry')
             await send_dry_message()
+        
+        else:
+            pass
 
 
         time.sleep(30)
