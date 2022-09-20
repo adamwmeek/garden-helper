@@ -18,7 +18,7 @@ import telegram
 
 import SoilState
 
-# The threshold for what counts as 'damp' on the sensor. Normal range is 300-900
+# The threshold for what counts as 'damp' on the sensor. Normal range is 200-2000
 # (Allegedly? Seeing some weird values in the logs so far...)
 DAMP_THRESHOLD = 400
 
