@@ -16,10 +16,16 @@ from adafruit_seesaw.seesaw import Seesaw
 import asyncio
 import telegram
 
+import SoilState
+
+# The threshold for what counts as 'damp' on the sensor. Normal range is 300-900
+# (Allegedly? Seeing some weird values in the logs so far...)
+DAMP_THRESHOLD = 400
+
+# Screen init
 SPI_SPEED_MHZ = 80
 
 font = ImageFont.truetype('DejaVuSans-Bold.ttf', 30)
-
 
 st7735 = ST7735(
     rotation=270,  
@@ -29,25 +35,33 @@ st7735 = ST7735(
     backlight=25,
     spi_speed_hz=SPI_SPEED_MHZ * 1000 * 1000
 )
-
 st7735.begin()
 
+# Sensor init
 i2c_bus = board.I2C()
 sensor = Seesaw(i2c_bus, addr=0x36)
 
+# Using a state machine to smooth out fluctuations in sensor measurement
+state = SoilState.SoilState()
+
+# Telegram bot init
 load_dotenv()
 BOT_TOKEN = getenv('BOT_TOKEN')
 CHAT_ID = getenv('CHAT_ID')
-
 bot = telegram.Bot(BOT_TOKEN)
-last_message_time = datetime.datetime.fromtimestamp(0)
+
+# Set initial last times to forever ago
+last_dry_message_time = datetime.datetime.fromtimestamp(0)
+last_watered_message_time = datetime.datetime.fromtimestamp(0)
 last_log_time = datetime.datetime.fromtimestamp(0)
 
+# Create soil log file with csv headers if it doesn't exist
 if not exists('soil_log.csv'):
     with open('soil_log.csv', 'w') as csvfile:
         soilwriter = csv.writer(csvfile, delimiter=',')
         soilwriter.writerow(['time', 'temp', 'moisture'])
 
+# Update text on the screen with specified text
 def draw_text(text):
     global font
     image = Image.open('garden_auto_flower_bg.png')
@@ -55,19 +69,35 @@ def draw_text(text):
     draw.text((10, 25), text, fill='#000000', font=font)
     st7735.display(image)
 
+# Send message to specified chat_id using telegram bot
 async def send_bot_message(message):
-    global bot, last_message_time, CHAT_ID
-
-    # 8 hour timeout so we don't spam ourselves
-    if datetime.datetime.now() - last_message_time < datetime.timedelta(hours=8):
-        return
+    global bot, CHAT_ID
 
     async with bot:
       await bot.send_message(text=message, chat_id=CHAT_ID)
-    last_message_time = datetime.datetime.now()
+    
+async def send_dry_message():
+    # 8 hour timeout so we don't spam ourselves
+    global last_dry_message_time
+    if datetime.datetime.now() - last_dry_message_time < datetime.timedelta(hours=8):
+        return
 
+    await send_bot_message('Plants are dry! Water us plz ;-;')
+    last_dry_message_time = datetime.datetime.now()
+
+async def send_watered_message():
+    # 8 hour timeout so we don't spam ourselves
+    global last_watered_message_time
+    if datetime.datetime.now() - last_watered_message_time < datetime.timedelta(hours=8):
+        return
+
+    await send_bot_message('Yay! Thank you for watering us! <3')
+    last_watered_message_time = datetime.datetime.now()
+
+# Main program loop
 async def main():
     global bot, last_log_time
+    print('Hello from garden bot!')
     while True:
 
         moisture = sensor.moisture_read()
@@ -80,11 +110,35 @@ async def main():
                 soilwriter.writerow([datetime.datetime.now().strftime('%X %x'), temp, moisture])
             last_log_time = datetime.datetime.now()
 
-        if moisture > 400:
-            draw_text('Damp')
+        # Next state logic
+        if moisture > DAMP_THRESHOLD:
+            if state.is_preDamp:
+                state.seeDampWhenPDamp()
+            elif state.is_preDry:
+                state.seeDampWhenPDry()
+            elif state.is_realDry:
+                state.seeDampWhenRDry()
+            else:
+                pass 
         else:
-           draw_text('Dry')
-           await send_bot_message('Plants are dry! Water them plz ;-;')
+            if state.is_preDamp:
+                state.seeDryWhenPDamp()
+            elif state.is_preDry:
+                state.seeDryWhenPDry()
+            elif state.is_realDamp:
+                state.seeDryWhenRDamp()
+            else:
+                pass 
+
+        # Update display based on state
+        if state.is_realDamp:
+            draw_text('Damp')
+            await send_watered_message()
+        
+        if state.is_realDry:
+            draw_text('Dry')
+            await send_dry_message()
+
 
         time.sleep(30)
 

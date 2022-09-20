@@ -11,7 +11,9 @@ I am planning on adding additional functionality to this project such as possibl
 ## Hardware
 
 [Raspberry Pi Zero W](https://www.raspberrypi.com/products/raspberry-pi-zero-w/)
+
 [Automation Hat Mini](https://shop.pimoroni.com/products/automation-hat-mini?variant=31478878077011)
+
 [Stemma Soil Sensor](https://learn.adafruit.com/adafruit-stemma-soil-sensor-i2c-capacitive-moisture-sensor)
 
 ## Other notes
