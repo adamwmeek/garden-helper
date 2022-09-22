@@ -19,8 +19,9 @@ import telegram
 import SoilState
 
 # The threshold for what counts as 'damp' on the sensor. Normal range is 200-2000
-# (Allegedly? Seeing some weird values in the logs so far...)
-DAMP_THRESHOLD = 400
+# Used a stand-alone soil moisture meter as reference, seems like 950 is a good threshold
+# Meter used: https://www.growertoday.com/three-way-meter-ph-light-moisture/
+DAMP_THRESHOLD = 950
 
 # Screen init
 SPI_SPEED_MHZ = 80
